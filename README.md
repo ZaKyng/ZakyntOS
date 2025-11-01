@@ -14,13 +14,13 @@ Menu Navigation to choose from multiple games
 
 Game Library:
 
-  Flappy Bird – Jump through pipes
-  Snake – Collect fruit and grow
-  RPS (Rock Paper Scissors) – Play against the bot
-  Pong – Classic paddle game
-  Dino – Jump over obstacles
-  Simon Says – Repeat the sequence
-  Scores – View stored best scores
+  Flappy Bird – Jump through pipes; 
+  Snake – Collect fruit and grow; 
+  RPS (Rock Paper Scissors) – Play against the bot; 
+  Pong – Classic paddle game; 
+  Dino – Jump over obstacles; 
+  Simon Says – Repeat the sequence; 
+  Scores – View stored best scores; 
 
 
 Persistent high scores stored in EEPROM
