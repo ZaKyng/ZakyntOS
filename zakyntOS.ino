@@ -4,7 +4,7 @@
 LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
 
 //for OS
-uint8_t bright = 85;
+uint8_t bright = 90;
 uint8_t frames = 0;
 uint8_t delay_time = 25;
 uint16_t delay_change = 0;
@@ -12,33 +12,40 @@ bool buttons[5] = {false}; //sequence left-up-right-down-any
 bool last_btns[4] = {false};
 uint8_t btn_pins[4] = {6, 5, 2, 4};
 uint8_t num_click = 0;
-String states[11] = {"menu", "flappy", "snake", "RPS", "pong", "game", "game", "game", "game", "game", "scores"};
+const char* states[11] = {"menu", "flappy", "snake", "RPS", "pong", "dino", "simon", "tetris", "game", "game", "scores"};
 int data[9] = {0};
 uint8_t num_states = 11;
 int8_t selected = 0;
 int8_t display_offset = 0;
-byte icons[13][8] = {
+byte icons[21][8] = {
   {0, 0, 0, 4, 10, 12, 0, 0}, //flappy
   {0, 12, 8, 10, 8, 10, 14, 0}, //snake
   {0, 0, 25, 26, 4, 26, 25, 0}, //scissors
   {1, 17, 21, 17, 1, 1, 1, 1}, // pong
-  {0, 0, 14, 8, 12, 2, 12, 0}, // 5
-  {0, 0, 4, 8, 12, 10, 4, 0}, // 6
-  {0, 0, 14, 2, 4, 8, 8, 0}, // 7
+  {0, 15, 15, 14, 31, 14, 10, 0}, // dino
+  {0, 0, 10, 27, 4, 27, 10, 0}, // simon
+  {0, 0, 2, 6, 2, 24, 28, 30}, // tetris
   {0, 0, 4, 10, 4, 10, 4, 0}, // 8
   {0, 0, 4, 10, 6, 2, 4, 0}, // 9
   {0, 0, 23, 0, 23, 0, 23, 0}, // scores
-  {0, 0, 31, 17, 10, 4, 0, 0}, // empty ↓
-  {0, 0, 31, 31, 14, 4, 0, 0}, // full ↓
-  {0, 0, 4, 10, 17, 31, 0, 0} // ↑
+  {0, 0, 31, 17, 10, 4, 0, 0}, // empty ↓ (-1)
+  {0, 0, 4, 10, 17, 31, 0, 0}, // empty ↑ ()
+  {0, 0, 6, 10, 18, 10, 6, 0}, // empty ← (+1)
+  {0, 0, 12, 10, 9, 10, 12, 0}, // empty → (+2)
+  {0, 0, 31, 31, 14, 4, 0, 0}, // full ↓ (+3)
+  {0, 0, 4, 14, 31, 31, 0, 0}, // full ↑ (+4)
+  {0, 0, 6, 14, 30, 14, 6, 0}, // full ← (+5)
+  {0, 0, 12, 14, 15, 14, 12, 0}, // full → (+6)
+  {0, 4, 10, 17, 31, 17, 10, 4}, // empty ↨ (+7)
+  {0, 4, 14, 31, 31, 17, 10, 4}, // full ↑↨ (+8)
+  {0, 4, 10, 17, 31, 31, 14, 4} // full ↓↨ (+9)
 };
 String state = states[0];
 bool alive = true;
 
 //flappy
-uint8_t steps[4] = {11, 3, 8, 0};
-uint8_t lengths[13] = {0, 0, 0, 0, 0, 0, 1, 3, 7, 14, 28, 24, 16}; //rotation of pipe widths
-uint8_t heights[5] = {8, 8, 8, 4, 1}; 
+uint8_t step = 11;
+uint8_t flappy_len[13] = {0, 0, 0, 0, 0, 0, 1, 3, 7, 14, 28, 24, 16}; //rotation of pipe widths
 
 //snake
 uint8_t dir = 2;
@@ -57,12 +64,14 @@ byte play[3][8] = {
 };
 uint8_t player = 1;
 
-//pong
-int8_t vector[2] = {1, 1};
+//Dino
+uint8_t dino_len[14] = {0, 0, 0, 0, 0, 0, 0, 1, 3, 7, 14, 28, 24, 16}; //rotation of cactuses/birds
 
 //for multiple games
 uint16_t length;
 uint16_t score = 0;
+uint8_t heights[5] = {8, 8, 8, 4, 1}; 
+int8_t vector[2] = {1, 1};
 byte characters[2][4][8];
 int8_t byte_n = 0;
 uint8_t tiles[4][16] = {0}; //4 slots with 16 lines each
@@ -91,25 +100,25 @@ void gameover(int score, int game) {
     lcd.print(score);
   } else {
     lcd.setCursor(0, 1);
-    lcd.print("Score: ");
+    lcd.print("Score ");
     lcd.print(score);
     lcd.setCursor(11, 0);
     lcd.print("Best:");
-    lcd.setCursor(11, 1);
+    lcd.setCursor(12, 1);
     lcd.print(data[game]);
   }
   delay_time = 25;
   alive = false;
 }
 
-void displayScore(int num) {
+void displayScore(int num, int offset) {
   int i = 0;
   if (num >= 0) {
     i = num;
   }
-  lcd.setCursor(8, 0);
+  lcd.setCursor(offset, 0);
   lcd.print("Score:");
-  lcd.setCursor(8, 1);
+  lcd.setCursor(offset, 1);
   lcd.print(i);
 }
 
@@ -127,6 +136,12 @@ void displayTiles(int offset) {
       byte_n++;
     }
   }
+  for(int i = 0; i < offset; i++) {
+    lcd.setCursor(i, 0);
+    lcd.write(255);
+    lcd.setCursor(i, 1);
+    lcd.write(255);
+  }
   byte_n = 0;
   for(int i = 0; i < 4; i++) {
     for(int n = 0; n < 2; n++) {
@@ -142,6 +157,14 @@ void changeDelay(int min, int interval) {
     if (delay_change != score) {
       delay_time--;
       delay_change = score;
+    }
+  }
+}
+
+void clearTiles() {
+  for(int i = 0; i < 4; i++) {
+    for(int n = 0; n < 16; n++) {
+      tiles[i][n] = 0;
     }
   }
 }
@@ -183,6 +206,56 @@ void RPSAnim() {
   delay(200);
 }
 
+void showArrows(int dir, int offset, int pause) {
+  lcd.setCursor(offset, 0);
+  if (dir == 4) {
+    lcd.write(byte(0));
+    lcd.write(byte(1));
+    lcd.write(byte(2));
+  } else {
+    if (dir == 0) {
+      lcd.write(byte(3));
+    } else {
+      lcd.write(byte(0));
+    }
+    if (dir == 1) {
+      lcd.write(byte(4));
+    } else if (dir == 3) {
+      lcd.write(byte(5));
+    } else {
+      lcd.write(byte(1));
+    }
+    if (dir == 2) {
+      lcd.write(byte(6));
+    } else {
+      lcd.write(byte(2));
+    }
+    delay(pause);
+    showArrows(4, offset, 0);
+  }
+  
+}
+
+void simonSays(int len, int pause) {
+  lcd.setCursor(0, 0);
+  lcd.print("Bot");
+  showArrows(4, 4, 0);
+  /*for(int i = 0; i < 3; i++) {
+    lcd.setCursor(5, 1);
+    lcd.print(3 - i);
+    delay(300);
+  }*/
+  lcd.setCursor(3, 1);
+  lcd.print("Focus");
+  delay(400);
+  for(int i = 0; i < len; i++) {
+    showArrows(body[i][0], 4, pause);
+    delay(pause);
+  }
+  lcd.clear();
+  showArrows(4, 4, 0);
+}
+
 void OSAnim() {
   lcd.setCursor(4, 0);
   lcd.print("Z");
@@ -215,6 +288,8 @@ void getData(int index) {
 }
 
 void setup() {
+  //Serial.begin(9600);
+  //delay(1000);
   pinMode (2, INPUT_PULLUP);
   pinMode (3, OUTPUT);
   pinMode (4, INPUT_PULLUP);
@@ -228,7 +303,7 @@ void setup() {
     body[i][1] = 0;
   }
   
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 6; i++) {
     getData(i);
   }
   
@@ -238,8 +313,8 @@ void setup() {
   OSAnim();
 }
 
-void loop() { // COPIED
-  //adjast brightness
+void loop() {
+  //adjust brightness
   analogWrite(3, (bright));
   if(!digitalRead(A0)) {
     if (bright < 255) {
@@ -270,15 +345,14 @@ void loop() { // COPIED
     }
   }
 
-  //menu view
-  if (state == "menu") { //COPYED
+  if (state == "menu") {
     byte_n = 0;
     for(int i = display_offset; i < display_offset + 6; i++) {
       lcd.createChar(byte_n, icons[i]); // chars 0 - 5
       byte_n++;
     }
     lcd.createChar(6, icons[num_states - 1]);
-    lcd.createChar(7, icons[num_states]);
+    lcd.createChar(7, icons[num_states + 3]);
     lcd.setCursor(0, 0);
     lcd.write("Menu");
     for (int i = 1; i < 7; i++) {
@@ -326,10 +400,7 @@ void loop() { // COPIED
         }
         heights[3] = random(8);
         heights[4] = random(8);
-        steps[0] = 11;
-        steps[1] = 3;
-        steps[2] = 8;
-        steps[3] = 0;
+        step = 11;
         score = -1;
       } else if (state == "snake") {
         length = 2;
@@ -337,7 +408,7 @@ void loop() { // COPIED
         nextdir = 4;
         body[0][0] = 1;
         body[0][1] = 2;
-        fruit[0] = random(19) + 2;
+        fruit[0] = random(18) + 3;
         fruit[1] = random(15) + 2;
       } else if (state == "RPS") {
         player = 1;
@@ -345,15 +416,41 @@ void loop() { // COPIED
         lcd.createChar(1, play[1]);
         lcd.createChar(2, play[2]);
         lcd.createChar(3, icons[num_states - 1]);
-        lcd.createChar(4, icons[num_states]);
-        lcd.createChar(5, icons[num_states + 1]);
+        lcd.createChar(4, icons[num_states + 3]);
+        lcd.createChar(5, icons[num_states]);
       } else if (state == "pong") {
         length = 1;
         vector[0] = 1;
         vector[1] = 1 - random(2) * 2;
         body[0][0] = 11;
-        body[0][1] = random(14) + 1;
+        body[0][1] = random(12) + 2;
         delay_time = 20;
+      } else if (state == "dino") {
+        player = 0;
+        vector[0] = 0;
+        vector[1] = 0;
+        length = 5;
+        heights[0] = 5;
+        heights[1] = 5;
+        for(int i = 2; i < 5; i++) {
+          heights[i] = 15;
+        }
+      } else if (state == "simon") {
+        lcd.createChar(0, icons[num_states + 1]);
+        lcd.createChar(1, icons[num_states + 7]);
+        lcd.createChar(2, icons[num_states + 2]);
+        lcd.createChar(3, icons[num_states + 5]);
+        lcd.createChar(4, icons[num_states + 8]);
+        lcd.createChar(5, icons[num_states + 9]);
+        lcd.createChar(6, icons[num_states + 6]);
+        player = 0;
+        dir = 4;
+        step = 255;
+        length = 1;
+        body[0][0] = random(4);
+        free_pixel = false;
+      } else if (state == "tetris") {
+        
       } else if (state == "scores") {
         player = 0;
         length = (num_states - 2) / 4;
@@ -363,7 +460,7 @@ void loop() { // COPIED
       } 
       lcd.clear();
     }
-  } else if (state == "flappy") { //RE-DONE
+  } else if (state == "flappy") { // Crumbles on death sometimes
     if (alive) {
       if (buttons[4]) {
         if (length >= 2) {
@@ -371,12 +468,7 @@ void loop() { // COPIED
         }
       }
 
-      //clearing tiles
-      for(int i = 0; i < 4; i++) {
-        for(int n = 0; n < 16; n++) {
-          tiles[i][n] = 0;
-        }
-      }
+      clearTiles();
 
       //creating all 4 tiles
       for(int i = 0; i < 4; i++) {
@@ -385,37 +477,33 @@ void loop() { // COPIED
             tiles[i][n] = 0;
           }
         } else {
-          tiles[i][0] = lengths[steps[i]];
-          tiles[i][15] = lengths[steps[i]];
+          tiles[i][0] = flappy_len[(step + (5 * i)) % 13];
+          tiles[i][15] = flappy_len[(step + (5 * i)) % 13];
           for(int n = 1; n < 15; n++) {
             if (heights[i] >= n) {
-              tiles[i][n] = lengths[steps[i]];
+              tiles[i][n] = flappy_len[(step + (5 * i)) % 13];
             } else if (heights[i] + 7 < n) {
-              tiles[i][n] = lengths[steps[i]];
+              tiles[i][n] = flappy_len[(step + (5 * i)) % 13];
             }
           }
         }
       }
       
-      for(int i = 0; i < length + 3; i++) {
-        if (length == i) {
-          tiles[1][i] = tiles[1][i] + 4;
-        } else if (length + 1 == i) {
-          tiles[1][i] = tiles[1][i] + 10;
-        } else if (length + 2 == i) {
-          tiles[1][i] = tiles[1][i] + 12;
-        }
-      }
+      tiles[1][length] += 4;
+      tiles[1][length + 1] += 10;
+      tiles[1][length + 2] += 12;
       
       if (frames % 10 == 0) {
+        step++;
+        if (step == 130) {
+          step = 0;
+        }
         for(int i = 0; i < 4; i++) {
-          steps[i]++;
-          if (steps[i] >= 13) {
-            steps[i] = 0;
+          if ((step + (5 * i)) % 13 == 0) {
             heights[i] = heights[i + 1];
           }
         }
-        if (steps[1] == 12) {
+        if (step % 13 == 7) {
           score++;
         }
       }
@@ -427,7 +515,7 @@ void loop() { // COPIED
       }
 
       displayTiles(0);
-      displayScore(score);
+      displayScore(score, 8);
       
       //death check
       if (length >= 13) {
@@ -439,7 +527,7 @@ void loop() { // COPIED
           gameover(score, 0);
         }
       } else if (((tiles[1][length + 3] & 4) == 4) or ((tiles[1][length + 3] & 8) == 8)) {
-        if (length < 12) {
+        if (length < 13) {
           gameover(score, 0);
         }
       } else if (tiles[1][length + 2] == 15) {
@@ -452,53 +540,47 @@ void loop() { // COPIED
 
       changeDelay(3, 2);
     } else if (buttons[4]) {
-      for(int i = 0; i < 4; i++) {
-        for(int n = 0; n < 16; n++) {
-          tiles[i][n] = 0;
-        }
-      }
+      clearTiles();
       state = states[0];
       lcd.clear();
     }
-  } else if (state == "snake") { //RE-WRITTEN
+  } else if (state == "snake") { //No bugs
     if (alive) {
+      if ((nextdir < 4) and (can_change)) {
+        dir = nextdir;
+        nextdir = 4;
+        can_change = false;
+      }
       for(int i = 0; i < 4; i++) {
         if (buttons[i] and dir != (i - 2) and dir != (i + 2)) {
           if (can_change) {
             dir = i;
             can_change = false;
-          } else if ((nextdir == 4) and (dir != i)) {
+          } else if ((nextdir == 4) and (i != dir)) {
             nextdir = i;
           }
-        } else if ((nextdir < 4) and (can_change)) {
-          dir = nextdir;
-          nextdir = 4;
         }
       }
       
-      for(int i = 0; i < 4; i++) {
-        for(int n = 0; n < 16; n++) {
-          tiles[i][n] = 0;
-        }
-      }
-
-      
+    
+      clearTiles();
 
       if (frames % 10 == 0) {
+        can_change = true;
         for(int i = length; i > 0; i--) {
           body[i][0] = body[i - 1][0];
           body[i][1] = body[i - 1][1];
         }
-        can_change = true;
         if (dir % 2 == 0) {
           body[0][0] += (dir - 1);
         } else {
           body[0][1] += (dir - 2);
         }
-
         if (body[0][0] == fruit[0] and body[0][1] == fruit[1]) {
           if (length < 239) {
             length++;
+            body[length][0] = 0;
+            body[length][1] = 0;
           }
           score++;
           if ((delay_time > 1) and (score % 1 == 0)) {
@@ -529,8 +611,8 @@ void loop() { // COPIED
       tiles[(fruit[0] - 1) / 5][fruit[1] - 1] += binary[(fruit[0] - 1) % 5];
      
       free_pixel = true;
-      for (int i = 0; i < length + 1; i++) {
-        if (body[i + 1][0] == body[0][0] and body[i + 1][1] == body[0][1]) {
+      for (int i = 1; i < length + 1; i++) {
+        if (body[i][0] == body[0][0] and body[i][1] == body[0][1]) {
           free_pixel = false;
         }
       }
@@ -541,11 +623,6 @@ void loop() { // COPIED
         }
         gameover(score, 1);
       } else {
-        lcd.setCursor(0, 0);
-        lcd.write(255);
-        lcd.setCursor(0, 1);
-        lcd.write(255);
-
         displayTiles(1);
         
         lcd.setCursor(5, 0);
@@ -553,19 +630,15 @@ void loop() { // COPIED
         lcd.setCursor(5, 1);
         lcd.write(255);
 
-        displayScore(score);
+        displayScore(score, 8);
       }
 
     } else if (buttons[4]) {
-      for(int i = 0; i < 4; i++) {
-        for(int n = 0; n < 16; n++) {
-          tiles[i][n] = 0;
-        }
-      }
+      clearTiles();
       state = states[0];
       lcd.clear();
     }
-  } else if (state == "RPS") { //RE-DONE
+  } else if (state == "RPS") { //No bugs
     if (alive) {
       if (buttons[0]) {
         player--;
@@ -596,18 +669,28 @@ void loop() { // COPIED
 
       if (buttons[3]) {
         randomSeed(frames);
-        length = random(3) + 1;
+        length = random(5) + 1;
+        length = length / 2;
         RPSAnim();
-        RPSPlay(player - 1, length - 1);
-        if (length == player) {
+        if (length == 0) {
+          length = player;
           RPSState("Draw", score);
-        } else if ((length == player + 1) or (player == 3 and length == 1)) {
+        } else if (length == 1) {
+          length = player + 1;
+          if (length == 4) {
+            length = 1;
+          }
           score = 0;
           RPSState("Lose", score);
         } else {
+          length = player - 1;
+          if (length == 0) {
+            length = 3;
+          }
           score++;
           RPSState("Win", score);
         }
+        RPSPlay(player - 1, length - 1);
       } else if (buttons[1]) { //back to menu
         state = states[0];
         lcd.clear();
@@ -616,7 +699,7 @@ void loop() { // COPIED
       alive = true;
       lcd.clear();
     }
-  } else if (state == "pong") { //RE-DONE
+  } else if (state == "pong") { // Sometimes bug (spawning Y)
     if (alive) {
       if (buttons[1]) {
         if (player > 0) {
@@ -625,7 +708,7 @@ void loop() { // COPIED
       }
 
       if (buttons[3]) {
-        if (player < 13) {
+        if (player < 14) {
           player++;
         }
       }
@@ -644,7 +727,7 @@ void loop() { // COPIED
         if (body[0][0] > 18) {
           vector[0] = vector[0] * -1;
         }
-        if (body[0][0] == 3 and -1 < body[0][1] - player and body[0][1] - player < 4) {
+        if (body[0][0] == 3 and -1 < body[0][1] - player and body[0][1] - player < 3) {
           vector[0] = vector[0] * -1;
           score++;
         }
@@ -653,16 +736,12 @@ void loop() { // COPIED
         }
       }
       
-      for(int i = 0; i < 4; i++) {
-        for(int n = 0; n < 16; n++) {
-          tiles[i][n] = 0;
-        }
-      }
+      clearTiles();
 
       for(int i = 0; i < 4; i++) {
         tiles[(body[i][0] - 1) / 5][body[i][1] - 1] += binary[(body[i][0] - 1) % 5];
       }
-      for(int i = 0; i < 3; i++) {
+      for(int i = 0; i < 2; i++) {
         if ((tiles[0][player + i] & 8) != 8) {
           tiles[0][player + i] += 8;
         }
@@ -673,16 +752,157 @@ void loop() { // COPIED
       lcd.write(255);
       lcd.setCursor(4, 1);
       lcd.write(255);
-      displayScore(score);
+      displayScore(score, 8);
 
       changeDelay(10, 1);
 
       if (body[0][0] == 1) {
         gameover(score, 3);
-        for (int i = 0; i < 4; i++) {
-          body[i][0] = 0;
-          body[i][1] = 0;
+        
+      }
+    } else if (buttons[4]) {
+      for (int i = 0; i < 4; i++) {
+        body[i][0] = 0;
+        body[i][1] = 0;
+      }
+      state = states[0];
+      lcd.clear();
+    }
+  } else if (state == "dino") { // No bugs so far
+    if (alive) {
+      if (buttons[3]) {
+        if (player == 0 and vector[1] == 0) {
+          vector[1] += 3;
         }
+      }
+
+      if (frames % 3 == 0) {
+        length++;
+        for(int i = 0; i < 4; i++) {
+          if ((length + 5*i) % 14 == 0) {
+            heights[i] = heights[i + 1];
+            if (i == 3) {
+              if (random(3) == 0) {
+                heights[4] = 5;
+              } else {
+                heights[4] = 15;
+              }
+            }
+          }
+        }
+      }
+      if (frames % 6 == 0) {
+        score++;
+        changeDelay(3, 50);
+        player += vector[1];
+        vector[1]--;
+        if (player == 0) {
+          vector[1] = 0;
+        }
+      }
+
+      clearTiles();
+
+      body[0][0] = 4;
+      body[0][1] = 15 - player;
+      body[1][0] = 2;
+      body[1][1] = 15 - player;
+
+      for(int i = 0; i < 5; i++) {
+        tiles[0][13 - i - player] += 14;
+      }
+      tiles[0][14 - player] += 10;
+      tiles[0][12 - player] += 17;
+      tiles[0][10 - player] += 1;
+      tiles[0][9 - player] += 1;
+      
+      for(int i = 0; i < 4; i++) {
+        for(int x = 0; x < 4; x++) {
+          tiles[i][heights[i] - x] += dino_len[(length + 5 * i) % 14];
+        }
+      }
+
+      for(int i = 0; i < 4; i++) {
+        tiles[i][15] = 31;
+      } 
+      
+      displayTiles(0);
+      displayScore(score, 8);
+
+      free_pixel = true;
+      for(int i = 0; i < 3; i++) {
+        if((tiles[0][15 - player] & binary[i + 1]) == binary[i + 1]) {
+          if (player != 0) {
+            free_pixel = false;
+            break;
+          }
+        }
+        if((tiles[0][8 - player] & binary[i + 1]) == binary[i + 1]) {
+          free_pixel = false;
+          break;
+        }
+        if((tiles[1][12 - i - player] & 16) == 16) {
+          free_pixel = false;
+          break;
+        }
+      }
+      if(((tiles[0][13 - player] & 1) == 1) or ((tiles[0][14 - player] & 1) == 1)) {
+        free_pixel = false;
+      }
+
+      if (!free_pixel) {
+        gameover(score, 4);
+      }
+    } else if (buttons[4]) {
+      state = states[0];
+      lcd.clear();
+    }
+  } else if (state == "simon") { //No bugs (so far)
+    if (alive) {
+      if (free_pixel) {
+        lcd.setCursor(0, 0);
+        lcd.print("You");
+        displayScore(score, 10);
+        for(int i = 0; i < 4; i++) {
+          if (buttons[i]) {
+            dir = i;
+            showArrows(dir, 4, step*2);
+            if (body[player][0] == dir) {
+              player++;
+            } else {
+              delay(300);
+              gameover(score, 5);
+            }
+            if (player == length) {
+              delay(300);
+              free_pixel = false;
+              score++;
+              displayScore(score, 10);
+              if (step > 150) {
+                step -= 10;
+              }
+              player = 0;
+              randomSeed(frames);
+              body[length][0] = random(4);
+              length++;
+            }
+          }
+        }
+      } else {
+        simonSays(length, step*2);
+        free_pixel = true;
+        dir = 4;
+      }
+    } else if (buttons[4]) {
+      state = states[0];
+      lcd.clear();
+    }
+  } else if (state == "tetris") { // NOT MADE
+    if (alive) {
+      
+      if (buttons[1]) {
+        state = states[0];
+        lcd.clear();
       }
     } else if (buttons[4]) {
       state = states[0];
@@ -710,6 +930,9 @@ void loop() { // COPIED
         i = 4;
       }
     }
+    lcd.createChar(4, icons[num_states]);
+    lcd.createChar(5, icons[num_states + 1]);
+    lcd.createChar(6, icons[num_states + 2]);
 
     for (int i = 0; i < 4; i++) {
       lcd.setCursor((i / 2) * 8, (i % 2));
@@ -720,6 +943,11 @@ void loop() { // COPIED
         i = 4;
       }
     }
+    lcd.setCursor(14, 0);
+    lcd.write(byte(4));
+    lcd.setCursor(14, 1);
+    lcd.write(byte(5));
+    lcd.write(byte(6));
     
     if (buttons[1]) {
       state = states[0];
