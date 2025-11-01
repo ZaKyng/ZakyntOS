@@ -69,5 +69,7 @@ Setup & Upload
   Once uploaded, the LCD should show a startup animation and enter the Menu; 
 
 License
+
 Open-source project for educational and hobbyist use; 
+As long as no one claims it as their own creation, you are free to use, modify, and share; 
 Developed by ZaKyntos — Hobby Electrical & Software Engineer; 
